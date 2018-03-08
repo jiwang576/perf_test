@@ -3,6 +3,7 @@
 
 from __future__ import print_function
 
+import csv
 import os
 import json
 import pickle
@@ -33,19 +34,25 @@ class ScoringService(object):
         return cls.model
 
     @classmethod
-    def predict(cls, inputs):
+    def predict(cls, inputs, input_path=None):
         """For the input, do the predictions and return them."""
         booster = cls.get_model()
 
         try:
-          inputs_dmatrix = xgb.DMatrix(inputs)
+          if input_path:
+            inputs_dmatrix = xgb.DMatrix("{}?format=csv&label_column=0")
+          else:
+            inputs_dmatrix = xgb.DMatrix(inputs)
+          print(inputs_dmatrix)
         except Exception as e:
           print("Could not initialize DMatrix from inputs.")
+          print(e)
 
         try:
-          return booster.predict(inputs_matrix, {})
+          return booster.predict(inputs_dmatrix, {})
         except Exception as e:
           print("Exception during predicting with xgboost model.")
+          print(e)
 
 
 # The flask app for serving predictions
@@ -76,6 +83,9 @@ def _read_csv_as_float(input_path):
   instances = []
   with open(input_path) as f:
     reader = csv.reader(f, delimiter=',', quoting=csv.QUOTE_NONNUMERIC)
+
+    print("we have a reader now")
+
     for row in reader:
       # The first item in each row is the label which we need to discard.
       instances.append(row[1:])
@@ -92,18 +102,18 @@ def transformation():
     # Convert from CSV to pandas
     if flask.request.content_type == 'text/csv':
         data = flask.request.data.decode('utf-8')
-        data = data.split('\n')
-        print(data[0])
-        print(type(data[0]))
-        print(data[1])
-        print(type(data[0]))
+        f = open("temp.csv", "wb")
+        f.write(data)
+        f.close()
+        data = _read_csv_as_float("temp.csv")
+
     else:
         return flask.Response(response='This predictor only supports CSV data', status=415, mimetype='text/plain')
 
     print('Invoked with {} records'.format(len(data)))
 
     # Do the prediction
-    predictions = ScoringService.predict(data)
+    predictions = ScoringService.predict(data, input_path="temp.csv")
 
     # Convert from numpy back to CSV
     print(str(type(predictions)))
