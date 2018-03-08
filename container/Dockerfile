@@ -14,8 +14,8 @@ RUN apt-get -y update && apt-get install -y --no-install-recommends \
          ca-certificates \
 	 git \
 	 make \
-	 g++ \
-    && rm -rf /var/lib/apt/lists/*
+	 g++
+#    && rm -rf /var/lib/apt/lists/*
 
 # Here we get all python packages.
 # There's substantial overlap between scipy and numpy that we eliminate by
