@@ -11,6 +11,7 @@ import pickle
 import StringIO
 import sys
 import signal
+import time
 import traceback
 
 import flask
@@ -27,13 +28,9 @@ class ScoringService(object):
     @classmethod
     def get_model(cls):
         """Get the model object for this instance, loading it if it's not already loaded."""
-        print("Trying to get model here.")
-        print("The current directory {} contains: ".format(model_path))
-        print(os.listdir(model_path))
         if cls.model == None:
             with open(os.path.join(model_path, 'model.pkl'), 'r') as inp:
                 cls.model = pickle.load(inp)
-            print(cls.model)
         return cls.model
 
     @classmethod
@@ -55,7 +52,6 @@ app = flask.Flask(__name__)
 def ping():
     """Determine if the container is working and healthy. In this sample container, we declare
     it healthy if we can load the model successfully."""
-    print("Going to ping.")
     health = ScoringService.get_model() is not None  # You can insert a health check here
 
     status = 200 if health else 404
@@ -78,8 +74,6 @@ def _read_csv_as_float(input_path):
   with open(input_path) as f:
     reader = csv.reader(f, delimiter=',', quoting=csv.QUOTE_NONNUMERIC)
 
-    print("we have a reader now")
-
     for row in reader:
       # The first item in each row is the label which we need to discard.
       instances.append(row[1:])
@@ -91,6 +85,9 @@ def transformation():
     it to a pandas data frame for internal use and then convert the predictions back to CSV (which really
     just means one prediction per line, since there's a single column.
     """
+
+    start_time = time.clock()
+
     data = None
 
     # Convert from CSV to pandas
@@ -100,6 +97,8 @@ def transformation():
         f.write(data)
         f.close()
         data = _read_csv_as_float("temp.csv")
+    elif flask.request.content_type == 'text/json':
+        data = flask.request.data.get('instances')
 
     else:
         return flask.Response(response='This predictor only supports CSV data', status=415, mimetype='text/plain')
@@ -110,10 +109,13 @@ def transformation():
     predictions = ScoringService.predict(data)
 
     # Convert from numpy back to CSV
-    print(str(type(predictions)))
-    print(len(predictions))
     out = StringIO.StringIO()
     numpy.savetxt(out, predictions)
-    result = out.getvalue()
+    result = {}
+    result['predictions'] = out.getvalue()
 
-    return flask.Response(response=result, status=200, mimetype='text/csv')
+    end_time = time.clock()
+
+    resp = flask.Response(response=json.dumps(result), status=200, mimetype='text/csv')
+    resp.headers['python-latency'] = end_time - start_time
+    return resp
