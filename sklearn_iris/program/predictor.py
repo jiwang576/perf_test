@@ -109,10 +109,9 @@ def transformation():
     predictions = ScoringService.predict(data)
 
     # Convert from numpy back to CSV
-    out = StringIO.StringIO()
-    numpy.savetxt(out, predictions)
+    print(type(predictions))
     result = {}
-    result['predictions'] = out.getvalue()
+    result['predictions'] = numpy.ndarray.tolist(predictions)
 
     end_time = time.clock()
 
