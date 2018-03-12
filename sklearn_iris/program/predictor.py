@@ -172,13 +172,13 @@ def transformation():
 
     stats = Stats()
     prediction_start_time = time.time()
-    stats['prediction_start_time'] = prediction_start_time * MICRO
-    stats['prediction_server_start_time'] = prediction_start_time * MICRO
+    stats['prediction-start-time'] = prediction_start_time * MICRO
+    stats['prediction-server-start-time'] = prediction_start_time * MICRO
 
-    with stats.time('prediction_total_time'):
+    with stats.time('prediction-total-time'):
       data = None
 
-      with stats.time('prediction_loads_time'):
+      with stats.time('prediction-loads-time'):
         if flask.request.content_type == 'text/csv':
             data = flask.request.data.decode('utf-8')
             f = open("temp.csv", "wb")
@@ -195,7 +195,7 @@ def transformation():
       print('Invoked with {} records'.format(len(data)))
 
       # Do the prediction
-      with stats.time('prediction_predict_time'):
+      with stats.time('prediction-predict-time'):
         predictions = ScoringService.predict(data)
 
       # Convert from numpy array to json response body
@@ -206,6 +206,6 @@ def transformation():
     resp = flask.Response(response=json.dumps(result), status=200, mimetype='text/csv')
     resp.headers.extend(stats)
     print("The collected stats are: " + str(stats))
-    print("We have prediction start time: " + str(resp.headers['prediction_server_start_time']))
+    print("We have prediction start time: " + str(resp.headers['prediction-server-start-time']))
     print("The response headers look like: " + str(resp.headers.to_list()))
     return resp
