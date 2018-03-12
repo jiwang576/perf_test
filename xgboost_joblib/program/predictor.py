@@ -18,6 +18,8 @@ from contextlib import contextmanager
 
 import flask
 
+import xgboost as xgb
+
 prefix = '/opt/ml/'
 model_path = os.path.join(prefix, 'model')
 
@@ -103,6 +105,7 @@ class Stats(dict):
       yield timer
     self[name] = timer.microseconds
 
+
 # A singleton for holding the model. This simply loads the model and holds it.
 # It has a predict function that does a prediction based on the model and the input data.
 
@@ -112,20 +115,30 @@ class ScoringService(object):
     @classmethod
     def get_model(cls):
         """Get the model object for this instance, loading it if it's not already loaded."""
+        print("Trying to get model here.")
+        print("The current directory {} contains: ".format(model_path))
+        print(os.listdir(model_path))
         if cls.model == None:
-            with open(os.path.join(model_path, 'model.pkl'), 'rb') as inp:
+            with open(os.path.join(model_path, 'model.pkl'), 'r') as inp:
                 cls.model = pickle.load(inp)
+            print(cls.model)
         return cls.model
 
     @classmethod
-    def predict(cls, inputs):
+    def predict(cls, inputs, input_path=None):
         """For the input, do the predictions and return them."""
-        sklearn_predictor = cls.get_model()
+        booster = cls.get_model()
 
         try:
-          return sklearn_predictor.predict(inputs)
+          inputs_dmatrix = xgb.DMatrix(inputs)
         except Exception as e:
-          print("Exception during predicting with sklearn model.")
+          print("Could not initialize DMatrix from inputs.")
+          print(e)
+
+        try:
+          return booster.predict(inputs_dmatrix, {})
+        except Exception as e:
+          print("Exception during predicting with xgboost model.")
           print(e)
 
 
@@ -169,7 +182,6 @@ def transformation():
     it to a pandas data frame for internal use and then convert the predictions back to CSV (which really
     just means one prediction per line, since there's a single column.
     """
-
     stats = Stats()
     prediction_start_time = time.time()
     stats['prediction-start-time'] = prediction_start_time * MILLI
