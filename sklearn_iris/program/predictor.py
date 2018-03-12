@@ -205,4 +205,7 @@ def transformation():
     with stats.time('prediction_dumps_time'):
       resp = flask.Response(response=json.dumps(result), status=200, mimetype='text/csv')
     resp.headers.extend(stats)
+    print("The collected stats are: " + str(stats))
+    print("We have prediction start time: " + str(resp.headers['prediction_server_start_time']))
+    print("The response headers look like: " + str(resp.headers.to_list()))
     return resp
