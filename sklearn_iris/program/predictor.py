@@ -201,9 +201,9 @@ def transformation():
       # Convert from numpy array to json response body
       result = {}
       result['predictions'] = numpy.ndarray.tolist(predictions)
+      result.update(stats)
 
-    with stats.time('prediction_dumps_time'):
-      resp = flask.Response(response=json.dumps(result), status=200, mimetype='text/csv')
+    resp = flask.Response(response=json.dumps(result), status=200, mimetype='text/csv')
     resp.headers.extend(stats)
     print("The collected stats are: " + str(stats))
     print("We have prediction start time: " + str(resp.headers['prediction_server_start_time']))
