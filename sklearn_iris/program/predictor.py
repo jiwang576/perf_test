@@ -12,12 +12,96 @@ import StringIO
 import sys
 import signal
 import time
+import timeit
 import traceback
+from contextlib import contextmanager
 
 import flask
 
 prefix = '/opt/ml/'
 model_path = os.path.join(prefix, 'model')
+
+MICRO = 1000000
+MILLI = 1000
+
+
+class Timer(object):
+  """Context manager for timing code blocks.
+
+  The object is intended to be used solely as a context manager and not
+  as a general purpose object.
+
+  The timer starts when __enter__ is invoked on the context manager
+  and stopped when __exit__ is invoked. After __exit__ is called,
+  the duration properties report the amount of time between
+  __enter__ and __exit__ and thus do not change. However, if any of the
+  duration properties are called between the call to __enter__ and __exit__,
+  then they will return the "live" value of the timer.
+
+  If the same Timer object is re-used in multiple with statements, the values
+  reported will reflect the latest call. Do not use the same Timer object in
+  nested with blocks with the same Timer context manager.
+
+  Example usage:
+
+    with Timer() as timer:
+      foo()
+    print(timer.duration_secs)
+  """
+
+  def __init__(self, timer_fn=None):
+    self.start = None
+    self.end = None
+    self._get_time = timer_fn or timeit.default_timer
+
+  def __enter__(self):
+    self.end = None
+    self.start = self._get_time()
+    return self
+
+  def __exit__(self, exc_type, value, traceback):
+    self.end = self._get_time()
+    return False
+
+  @property
+  def seconds(self):
+    now = self._get_time()
+    return (self.end or now) - (self.start or now)
+
+  @property
+  def microseconds(self):
+    return int(MICRO * self.seconds)
+
+  @property
+  def milliseconds(self):
+    return int(MILLI * self.seconds)
+
+
+class Stats(dict):
+  """An object for tracking stats.
+
+  This class is dict-like, so stats are accessed/stored like so:
+
+    stats = Stats()
+    stats["count"] = 1
+    stats["foo"] = "bar"
+
+  This class also facilitates collecting timing information via the
+  context manager obtained using the "time" method. Reported timings
+  are in microseconds.
+
+  Example usage:
+
+    with stats.time("foo_time"):
+      foo()
+    print(stats["foo_time"])
+  """
+
+  @contextmanager
+  def time(self, name, timer_fn=None):
+    with Timer(timer_fn) as timer:
+      yield timer
+    self[name] = timer.microseconds
 
 # A singleton for holding the model. This simply loads the model and holds it.
 # It has a predict function that does a prediction based on the model and the input data.
@@ -86,35 +170,39 @@ def transformation():
     just means one prediction per line, since there's a single column.
     """
 
-    start_time = time.clock()
+    stats = Stats()
+    prediction_start_time = time.time()
+    stats['prediction_start_time'] = prediction_start_time * MICRO
+    stats['prediction_server_start_time'] = prediction_start_time * MICRO
 
-    data = None
+    with stats.time('prediction_total_time'):
+      data = None
 
-    # Convert from CSV to pandas
-    if flask.request.content_type == 'text/csv':
-        data = flask.request.data.decode('utf-8')
-        f = open("temp.csv", "wb")
-        f.write(data)
-        f.close()
-        data = _read_csv_as_float("temp.csv")
-    elif flask.request.content_type == 'text/json':
-        data = flask.request.data.get('instances')
+      with stats.time('prediction_loads_time'):
+        if flask.request.content_type == 'text/csv':
+            data = flask.request.data.decode('utf-8')
+            f = open("temp.csv", "wb")
+            f.write(data)
+            f.close()
+            data = _read_csv_as_float("temp.csv")
+        elif flask.request.content_type == 'text/json':
+          # not implemented
+            data = flask.request.data.get('instances')
 
-    else:
-        return flask.Response(response='This predictor only supports CSV data', status=415, mimetype='text/plain')
+        else:
+            return flask.Response(response='This predictor only supports CSV data', status=415, mimetype='text/plain')
 
-    print('Invoked with {} records'.format(len(data)))
+      print('Invoked with {} records'.format(len(data)))
 
-    # Do the prediction
-    predictions = ScoringService.predict(data)
+      # Do the prediction
+      with stats.time('prediction_predict_time'):
+        predictions = ScoringService.predict(data)
 
-    # Convert from numpy back to CSV
-    print(type(predictions))
-    result = {}
-    result['predictions'] = numpy.ndarray.tolist(predictions)
+      # Convert from numpy array to json response body
+      result = {}
+      result['predictions'] = numpy.ndarray.tolist(predictions)
 
-    end_time = time.clock()
-
-    resp = flask.Response(response=json.dumps(result), status=200, mimetype='text/csv')
-    resp.headers['python-latency'] = end_time - start_time
+    with stats.time('prediction_dumps_time'):
+      resp = flask.Response(response=json.dumps(result), status=200, mimetype='text/csv')
+    resp.headers.extend(stats)
     return resp
