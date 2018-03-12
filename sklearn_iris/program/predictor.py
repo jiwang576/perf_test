@@ -198,10 +198,10 @@ def transformation():
       with stats.time('prediction-predict-time'):
         predictions = ScoringService.predict(data)
 
-      # Convert from numpy array to json response body
-      result = {}
-      result['predictions'] = numpy.ndarray.tolist(predictions)
-      result.update(stats)
+    # Convert from numpy array to json response body
+    result = {}
+    result['predictions'] = numpy.ndarray.tolist(predictions)
+    result.update(stats)
 
     resp = flask.Response(response=json.dumps(result), status=200, mimetype='text/csv')
     resp.headers.extend(stats)
