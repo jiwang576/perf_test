@@ -172,8 +172,8 @@ def transformation():
 
     stats = Stats()
     prediction_start_time = time.time()
-    stats['prediction-start-time'] = prediction_start_time * MICRO
-    stats['prediction-server-start-time'] = prediction_start_time * MICRO
+    stats['prediction-start-time'] = prediction_start_time * MILLI
+    stats['prediction-server-start-time'] = prediction_start_time * MILLI
 
     with stats.time('prediction-total-time'):
       data = None
@@ -205,7 +205,4 @@ def transformation():
 
     resp = flask.Response(response=json.dumps(result), status=200, mimetype='text/csv')
     resp.headers.extend(stats)
-    print("The collected stats are: " + str(stats))
-    print("We have prediction start time: " + str(resp.headers['prediction-server-start-time']))
-    print("The response headers look like: " + str(resp.headers.to_list()))
     return resp
