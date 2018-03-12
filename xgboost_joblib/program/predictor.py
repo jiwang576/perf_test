@@ -130,12 +130,16 @@ class ScoringService(object):
         except Exception as e:
           print("Could not initialize DMatrix from inputs.")
           print(e)
+          print("Propagating exception to the invocation endpoint.")
+          raise
 
         try:
           return booster.predict(inputs_dmatrix, {})
         except Exception as e:
           print("Exception during predicting with xgboost model.")
           print(e)
+          print("Propagating exception to the invocation endpoint.")
+          raise
 
 
 # The flask app for serving predictions
@@ -178,39 +182,44 @@ def transformation():
     it to a pandas data frame for internal use and then convert the predictions back to CSV (which really
     just means one prediction per line, since there's a single column.
     """
-    stats = Stats()
-    prediction_start_time = time.time()
-    stats['prediction-start-time'] = prediction_start_time * MILLI
-    stats['prediction-server-start-time'] = prediction_start_time * MILLI
+    try:
+      stats = Stats()
+      prediction_start_time = time.time()
+      stats['prediction-start-time'] = prediction_start_time * MILLI
+      stats['prediction-server-start-time'] = prediction_start_time * MILLI
 
-    with stats.time('prediction-total-time'):
-      data = None
+      with stats.time('prediction-total-time'):
+        data = None
 
-      with stats.time('prediction-loads-time'):
-        if flask.request.content_type == 'text/csv':
-            data = flask.request.data.decode('utf-8')
-            f = open("temp.csv", "wb")
-            f.write(data)
-            f.close()
-            data = _read_csv_as_float("temp.csv")
-        elif flask.request.content_type == 'text/json':
-          # not implemented
-            data = flask.request.data.get('instances')
+        with stats.time('prediction-loads-time'):
+          if flask.request.content_type == 'text/csv':
+              data = flask.request.data.decode('utf-8')
+              f = open("temp.csv", "wb")
+              f.write(data)
+              f.close()
+              data = _read_csv_as_float("temp.csv")
+          elif flask.request.content_type == 'text/json':
+            # not implemented
+              data = flask.request.data.get('instances')
 
-        else:
-            return flask.Response(response='This predictor only supports CSV data', status=415, mimetype='text/plain')
+          else:
+              return flask.Response(response='This predictor only supports CSV data', status=415, mimetype='text/plain')
 
-      print('Invoked with {} records'.format(len(data)))
+        print('Invoked with {} records'.format(len(data)))
 
-      # Do the prediction
-      with stats.time('prediction-predict-time'):
-        predictions = ScoringService.predict(data)
+        # Do the prediction
+        with stats.time('prediction-predict-time'):
+          predictions = ScoringService.predict(data)
 
-    # Convert from numpy array to json response body
-    result = {}
-    result['predictions'] = numpy.ndarray.tolist(predictions)
-    result.update(stats)
+      # Convert from numpy array to json response body
+      result = {}
+      result['predictions'] = numpy.ndarray.tolist(predictions)
+      result.update(stats)
 
-    resp = flask.Response(response=json.dumps(result), status=200, mimetype='text/csv')
-    resp.headers.extend(stats)
-    return resp
+      resp = flask.Response(response=json.dumps(result), status=200, mimetype='text/csv')
+      resp.headers.extend(stats)
+      return resp
+    except Exception as e:
+      print("Exception thrown when doing prediction.")
+      print(e)
+      resp = flask.Response(response="Exception thrown when doing prediction: " + str(e), status=500, mimetype='application/json')
