@@ -7,7 +7,6 @@ import csv
 import os
 import json
 import numpy
-import pickle
 import StringIO
 import sys
 import signal
@@ -15,6 +14,7 @@ import time
 import timeit
 import traceback
 from contextlib import contextmanager
+from sklearn.externals import joblib
 
 import flask
 
@@ -115,13 +115,10 @@ class ScoringService(object):
     @classmethod
     def get_model(cls):
         """Get the model object for this instance, loading it if it's not already loaded."""
-        print("Trying to get model here.")
-        print("The current directory {} contains: ".format(model_path))
-        print(os.listdir(model_path))
+        print("Using joblib")
         if cls.model == None:
-            with open(os.path.join(model_path, 'model.pkl'), 'r') as inp:
-                cls.model = pickle.load(inp)
-            print(cls.model)
+            with open(os.path.join(model_path, 'model.joblib'), 'rb') as inp:
+                cls.model = joblib.load(inp)
         return cls.model
 
     @classmethod

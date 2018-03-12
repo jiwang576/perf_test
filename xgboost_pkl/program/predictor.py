@@ -115,13 +115,9 @@ class ScoringService(object):
     @classmethod
     def get_model(cls):
         """Get the model object for this instance, loading it if it's not already loaded."""
-        print("Trying to get model here.")
-        print("The current directory {} contains: ".format(model_path))
-        print(os.listdir(model_path))
         if cls.model == None:
             with open(os.path.join(model_path, 'model.pkl'), 'r') as inp:
                 cls.model = pickle.load(inp)
-            print(cls.model)
         return cls.model
 
     @classmethod
