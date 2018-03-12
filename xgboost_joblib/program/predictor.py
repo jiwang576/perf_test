@@ -115,7 +115,6 @@ class ScoringService(object):
     @classmethod
     def get_model(cls):
         """Get the model object for this instance, loading it if it's not already loaded."""
-        print("Using joblib")
         if cls.model == None:
             with open(os.path.join(model_path, 'model.joblib'), 'rb') as inp:
                 cls.model = joblib.load(inp)

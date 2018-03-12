@@ -7,7 +7,6 @@ import csv
 import os
 import json
 import numpy
-import pickle
 import StringIO
 import sys
 import signal
