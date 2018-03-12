@@ -44,6 +44,6 @@ ENV PYTHONDONTWRITEBYTECODE=TRUE
 ENV PATH="/opt/program:${PATH}"
 
 # Set up the program in the image
-COPY xgboost /opt/program
+COPY program /opt/program
 WORKDIR /opt/program
 
